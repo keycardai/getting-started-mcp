@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local environment. `keycard new mcp` writes the application's client ID and
+# secret here, and `vercel env pull` writes .env.local.
+.env
+.env.local
+keycard.toml
+.vercel
+
+# Local MCP client config (e.g. which MCP servers your agent connects to).
+.mcp.json
+.env*

@@ -1,0 +1,36 @@
+[project]
+name = "getting-started-mcp"
+version = "0.1.0"
+description = "A Keycard-protected MCP server you can run locally and deploy"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = [
+    "fastmcp>=4.0.11",
+    "httpx>=0.28.1",
+    "keycardai-fastmcp>=0.7.1",
+    "python-dotenv>=1.2",
+]
+
+[dependency-groups]
+dev = ["pyright>=1.1.400"]
+
+[project.scripts]
+getting-started-mcp = "getting_started_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/getting_started_mcp"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+include = ["src"]
+
+[tool.vercel]
+entrypoint = "src.getting_started_mcp.server:app"

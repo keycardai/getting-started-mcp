@@ -1,0 +1,15 @@
+# Keep local secrets and config out of the Vercel upload. `vercel deploy`
+# bundles the working directory, and it does not read .gitignore, so these
+# have to be listed here as well. The deployed server reads its configuration
+# from Vercel environment variables (KEYCARD_ZONE_URL) and authenticates with
+# Vercel's workload identity, so none of these belong in the deployment.
+.env
+.env.*
+keycard.toml
+.mcp.json
+
+# Local tooling, caches, and the Vercel link directory.
+.venv/
+__pycache__/
+.vercel/
+.git/
