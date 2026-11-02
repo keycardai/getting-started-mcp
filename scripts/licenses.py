@@ -26,7 +26,10 @@ what is actually seen to SPDX ids rather than attempting to parse prose.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from importlib.metadata import Distribution, distributions
 from pathlib import Path
 
@@ -98,9 +101,44 @@ def identifiers(expression: str) -> list[str]:
     return [t for t in tokens if t and t.upper() not in {"AND", "OR", "WITH"}]
 
 
-def installed() -> list[Distribution]:
+# The server is deployed to Linux. A dependency that only resolves there --
+# keyring pulls in jeepney and secretstorage on Linux and neither on macOS --
+# would otherwise be missing from a NOTICE written on a macOS workstation, and
+# the gate would pass locally and fail in CI. So the environment read here is
+# always resolved for Linux, whatever the host is.
+TARGET_PLATFORM = "linux"
+TARGET_PYTHON = "3.12"
+
+
+def target_environment(into: Path) -> Path:
+    """Resolve uv.lock for the deployment platform and unpack it into `into`.
+
+    Nothing from this directory is imported or executed; only distribution
+    metadata and the licence files beside it are read.
+    """
+    if not shutil.which("uv"):
+        print("licenses.py: uv not found. See README.md.", file=sys.stderr)
+        raise SystemExit(1)
+
+    requirements = into / "requirements.txt"
+    subprocess.run(
+        ["uv", "export", "--no-dev", "--no-emit-project", "--no-hashes",
+         "--quiet", "-o", str(requirements)],
+        check=True,
+    )
+    subprocess.run(
+        ["uv", "pip", "install", "--quiet", "--no-deps",
+         "--python-platform", TARGET_PLATFORM,
+         "--python-version", TARGET_PYTHON,
+         "--target", str(into / "env"), "-r", str(requirements)],
+        check=True,
+    )
+    return into / "env"
+
+
+def installed(root: Path) -> list[Distribution]:
     seen: dict[str, Distribution] = {}
-    for dist in distributions():
+    for dist in distributions(path=[str(root)]):
         name = dist.metadata["Name"]
         # The project itself is not third-party.
         if name and name.lower() != "getting-started-mcp":
@@ -108,10 +146,10 @@ def installed() -> list[Distribution]:
     return [seen[k] for k in sorted(seen, key=str.lower)]
 
 
-def check_licenses() -> int:
+def check_licenses(root: Path) -> int:
     bad = []
     unknown = []
-    for dist in installed():
+    for dist in installed(root):
         expression, source = resolve(dist)
         name = f"{dist.metadata['Name']} {dist.version}"
         if not expression:
@@ -135,7 +173,7 @@ def check_licenses() -> int:
         return 1
 
     print(
-        f"check-licenses: OK. {len(installed())} distributions, every id on the "
+        f"check-licenses: OK. {len(installed(root))} distributions, every id on the "
         f"allow-list: {', '.join(sorted(ALLOWED))}"
     )
     return 0
@@ -165,10 +203,10 @@ def licence_files(dist: Distribution) -> list[tuple[str, str]]:
     return out
 
 
-def render() -> str:
+def render(root: Path) -> str:
     header = (Path(__file__).parent / "notice.tpl").read_text()
     out = [header.rstrip("\n")]
-    for dist in installed():
+    for dist in installed(root):
         expression, _ = resolve(dist)
         out.append("")
         out.append("-" * 76)
@@ -197,24 +235,28 @@ def main(argv: list[str]) -> int:
     if command == "--allowed":
         print("\n".join(sorted(ALLOWED)))
         return 0
-    if command == "check-licenses":
-        return check_licenses()
-    if command == "notice":
-        notice.write_text(render())
-        print(f"notice: wrote NOTICE, {len(installed())} distributions")
-        return 0
-    if command == "check-notice":
-        if notice.read_text() != render():
+
+    if command not in {"check-licenses", "notice", "check-notice"}:
+        print(f"licenses.py: unknown command: {command}", file=sys.stderr)
+        return 2
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = target_environment(Path(tmp))
+
+        if command == "check-licenses":
+            return check_licenses(root)
+        if command == "notice":
+            notice.write_text(render(root))
+            print(f"notice: wrote NOTICE, {len(installed(root))} distributions")
+            return 0
+        if notice.read_text() != render(root):
             print(
                 "notice: FAIL. NOTICE is stale; run 'make notice' and commit the result.",
                 file=sys.stderr,
             )
             return 1
-        print("notice: OK. NOTICE matches the locked environment.")
+        print(f"notice: OK. NOTICE matches uv.lock resolved for {TARGET_PLATFORM}.")
         return 0
-
-    print(f"licenses.py: unknown command: {command}", file=sys.stderr)
-    return 2
 
 
 if __name__ == "__main__":
