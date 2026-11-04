@@ -7,7 +7,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_http_headers
 from keycardai.fastmcp import AccessContext, AuthProvider
-from keycardai.oauth.server import WorkloadIdentity
+from keycardai.oauth.server import FlyTokenSource, WorkloadIdentity
 
 from getting_started_mcp import config, github, identity, linear
 
@@ -68,9 +68,10 @@ def _application_credential() -> WorkloadIdentity | None:
     jwt-bearer client assertion (see _vercel_oidc_token for how it is sourced).
     No client secret is deployed.
 
-    The decision keys off the VERCEL marker, not the token's presence, so the
+    On Fly, the SDK fetches a fresh token over the Machine's local API socket.
+    The decision keys off the platform marker, not the token's presence, so the
     source is resolved per exchange rather than frozen at import. Returns None
-    off Vercel, so AuthProvider falls back to discovering
+    locally, so AuthProvider falls back to discovering
     KEYCARD_CLIENT_ID/KEYCARD_CLIENT_SECRET from the environment for local runs.
 
     Requires Vercel's OIDC federation to be enabled for the project. The
@@ -78,13 +79,17 @@ def _application_credential() -> WorkloadIdentity | None:
     token-federation rule; it is a client identifier, not a secret, and is
     omitted when unset.
     """
-    if not os.getenv("VERCEL"):
-        return None
-
-    return WorkloadIdentity(
-        _vercel_oidc_token,
-        client_id=os.getenv("KEYCARD_CLIENT_ID"),
-    )
+    if os.getenv("VERCEL"):
+        return WorkloadIdentity(
+            _vercel_oidc_token,
+            client_id=os.getenv("KEYCARD_CLIENT_ID"),
+        )
+    if os.getenv("FLY_APP_NAME"):
+        return WorkloadIdentity(
+            FlyTokenSource(audience=config.ZONE_URL),
+            client_id=os.getenv("KEYCARD_CLIENT_ID"),
+        )
+    return None
 
 
 keycard = AuthProvider(

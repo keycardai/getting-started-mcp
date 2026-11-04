@@ -73,13 +73,15 @@ def _server_url() -> str:
     caller can actually reach. Prefer an explicit MCP_SERVER_URL. On Vercel,
     fall back to the project's stable production domain so a deploy works
     without setting anything (VERCEL_PROJECT_PRODUCTION_URL has no scheme, and
-    is stable across deploys, unlike the per-deploy VERCEL_URL). Locally, fall
-    back to localhost.
+    is stable across deploys, unlike the per-deploy VERCEL_URL). On Fly, use the
+    app's public hostname. Locally, fall back to localhost.
     """
     if url := os.getenv("MCP_SERVER_URL"):
         return url
     if host := os.getenv("VERCEL_PROJECT_PRODUCTION_URL"):
         return f"https://{host}/mcp"
+    if app := os.getenv("FLY_APP_NAME"):
+        return f"https://{app}.fly.dev/mcp"
     return f"http://localhost:{PORT}/mcp"
 
 
@@ -87,7 +89,8 @@ def _server_url() -> str:
 SERVER_URL = _server_url()
 
 # Whether the application announces itself at startup. On by default locally,
-# off on Vercel, where it would run on every cold start.
+# off when deployed, so the server can start before its identity is registered.
 STARTUP_IDENTITY_CHECK = _flag(
-    "KEYCARD_STARTUP_IDENTITY_CHECK", default=not os.getenv("VERCEL")
+    "KEYCARD_STARTUP_IDENTITY_CHECK",
+    default=not (os.getenv("VERCEL") or os.getenv("FLY_APP_NAME")),
 )

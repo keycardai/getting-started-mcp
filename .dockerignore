@@ -1,0 +1,9 @@
+.git
+.venv
+.env*
+keycard.toml
+.mcp.json
+.vercel
+__pycache__
+*.pyc
+tests
