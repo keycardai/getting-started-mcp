@@ -9,7 +9,7 @@ VERCEL_ENV ?= production
 DEPLOY_ENV_VARS ?= KEYCARD_ZONE_URL
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev run typecheck clean env-push env-pull env-list
+.PHONY: help install dev run test typecheck clean env-push env-pull env-list
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -26,6 +26,9 @@ run: ## Run the server
 
 typecheck: ## Type-check the source
 	uv run pyright
+
+test: ## Test deployment configuration and credential selection
+	uv run python -m unittest discover -s tests
 
 clean: ## Remove build and bytecode artifacts
 	rm -rf build dist .pytest_cache
