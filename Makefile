@@ -9,7 +9,8 @@ VERCEL_ENV ?= production
 DEPLOY_ENV_VARS ?= KEYCARD_ZONE_URL
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev run test typecheck clean env-push env-pull env-list
+.PHONY: help install dev run test typecheck clean checks check-licenses \
+        notice check-notice licenses-allowed env-push env-pull env-list
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -29,6 +30,20 @@ typecheck: ## Type-check the source
 
 test: ## Test deployment configuration and credential selection
 	uv run python -m unittest discover -s tests
+
+checks: check-licenses check-notice ## Run the licence gates
+
+check-licenses: ## Check every installed distribution against the allow-list
+	uv run python scripts/licenses.py check-licenses
+
+notice: ## Regenerate NOTICE's third-party attributions
+	uv run python scripts/licenses.py notice
+
+check-notice: ## Fail when NOTICE no longer matches the locked environment
+	uv run python scripts/licenses.py check-notice
+
+licenses-allowed: ## Print the licence allow-list
+	uv run python scripts/licenses.py --allowed
 
 clean: ## Remove build and bytecode artifacts
 	rm -rf build dist .pytest_cache
