@@ -1,0 +1,15 @@
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  HOST = "0.0.0.0"
+  PORT = "8181"
+
+[http_service]
+  internal_port = 8181
+  force_https = true
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

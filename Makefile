@@ -9,7 +9,7 @@ VERCEL_ENV ?= production
 DEPLOY_ENV_VARS ?= KEYCARD_ZONE_URL
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev run typecheck clean checks check-licenses \
+.PHONY: help install dev run test typecheck clean checks check-licenses \
         notice check-notice licenses-allowed env-push env-pull env-list
 
 help: ## Show this help
@@ -27,6 +27,9 @@ run: ## Run the server
 
 typecheck: ## Type-check the source
 	uv run pyright
+
+test: ## Test deployment configuration and credential selection
+	uv run python -m unittest discover -s tests
 
 checks: check-licenses check-notice ## Run the licence gates
 
