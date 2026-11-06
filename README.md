@@ -1,6 +1,6 @@
 # Getting Started MCP
 
-MCP server that reads GitHub on your behalf using short-lived tokens from Keycard for each call.
+MCP server that reads GitHub and Linear on your behalf using short-lived tokens from Keycard for each call.
 
 Run it locally, connect Claude Code, and reads will appear in the Keycard console under your name.
 
@@ -9,6 +9,8 @@ Run it locally, connect Claude Code, and reads will appear in the Keycard consol
 `whoami` answers as you, reading claims from your Keycard zone. At startup the server authenticates as _itself_ with the credential in `.env` and reads the claims of the token Keycard issues it. That issuance appears in the Keycard console with the application as the subject, rather than you.
 
 `list_pull_requests` returns your open pull requests. The server asks Keycard for a token scoped to you, spends it on GitHub's hosted MCP server, and discards it. This call appears in the Keycard console with you as the subject, rather than the application.
+
+`list_tickets` returns your assigned Linear tickets, newest activity first. It uses a token scoped to you on Linear's hosted MCP server, just like the GitHub tool.
 
 ## Prerequisites
 
@@ -45,6 +47,8 @@ You need Python 3.12 or later, [uv](https://docs.astral.sh/uv/), and a Keycard a
 
    In the console: go to Dependencies, choose Add Dependency, then Add Resource, and pick GitHub MCP. Keycard walks you through connecting GitHub and then holds tokens for you.
 
+   To use `list_tickets`, add Linear as a dependency the same way.
+
 5. Connect Claude Code.
 
    ```bash
@@ -77,6 +81,9 @@ Every value comes from `.env`, which is written by `keycard new mcp` and loaded 
 | `PORT`                           | Port the HTTP transport binds to.                          | `8181`                      |
 | `HOST`                           | Address it binds to.                                       | `127.0.0.1`                 |
 | `KEYCARD_USERINFO_RESOURCE`      | Override the UserInfo endpoint.                            | derived from the zone URL   |
+| `KEYCARD_GITHUB_MCP_RESOURCE`    | GitHub MCP Resource URL.                                   | `https://api.githubcopilot.com/mcp/` |
+| `KEYCARD_LINEAR_RESOURCE`        | Linear MCP Resource URL.                                   | `https://mcp.linear.app/mcp` |
+| `LOG_LEVEL`                      | Logging level.                                            | `INFO`                      |
 | `KEYCARD_STARTUP_IDENTITY_CHECK` | Whether to announce the application at startup.            | on locally, off on Vercel/Fly |
 
 The server runs without `KEYCARD_CLIENT_ID` and `KEYCARD_CLIENT_SECRET`, so you can start it before you enroll. It logs a warning and skips the startup call.
@@ -93,6 +100,8 @@ Run `make` to see the list.
 | `make dev`       | Run the server with debug logging.               |
 | `make run`       | Run the server.                                  |
 | `make typecheck` | Type-check the source.                           |
+| `make test`      | Test deployment configuration and credential selection. |
+| `make clean`     | Remove build and bytecode artifacts.             |
 | `make env-push`  | Push selected `.env` keys to the Vercel project. |
 | `make env-pull`  | Pull the Vercel environment into `.env.local`.   |
 | `make env-list`  | List the environment set on the Vercel project.  |
@@ -105,6 +114,7 @@ Run `make` to see the list.
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `src/getting_started_mcp/server.py`   | Tool definitions, the startup hook, and the entry point.                                                           |
 | `src/getting_started_mcp/github.py`   | GitHub MCP calls. Takes a token, knows nothing about Keycard.                                                      |
+| `src/getting_started_mcp/linear.py`   | Linear MCP calls. Takes a token, knows nothing about Keycard.                                                      |
 | `src/getting_started_mcp/identity.py` | Identity reads: your UserInfo answer (the `whoami` tool) and the application's own issued-token claims at startup. |
 | `src/getting_started_mcp/config.py`   | Environment-derived settings.                                                                                      |
 | `scripts/env-push.sh`                 | The `make env-push` implementation.                                                                                |
