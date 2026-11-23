@@ -77,6 +77,7 @@ Every value comes from `.env`, which is written by `keycard new mcp` and loaded 
 | `KEYCARD_ZONE_URL`               | Your Keycard zone. Required.                               | none                        |
 | `KEYCARD_CLIENT_ID`              | The application's client ID, written by `keycard new mcp`. | none                        |
 | `KEYCARD_CLIENT_SECRET`          | Its secret, written by `keycard new mcp`.                  | none                        |
+| `KEYCARD_WORKLOAD_CLIENT_ID`     | The deployment's workload client ID, which Keycard shows after you register the deployment. Read only by `make env-push`. | none |
 | `MCP_SERVER_URL`                 | The URL Keycard knows this server by.                      | Platform URL on Vercel/Fly, `http://localhost:8181/mcp` locally |
 | `PORT`                           | Port the HTTP transport binds to.                          | `8181`                      |
 | `HOST`                           | Address it binds to.                                       | `127.0.0.1`                 |
@@ -106,7 +107,7 @@ Run `make` to see the list.
 | `make env-pull`  | Pull the Vercel environment into `.env.local`.   |
 | `make env-list`  | List the environment set on the Vercel project.  |
 
-`make env-push` sends `KEYCARD_ZONE_URL` from `.env` to the linked Vercel project. It does not send `KEYCARD_CLIENT_ID` or `KEYCARD_CLIENT_SECRET`. The deployed server authenticates with Vercel's workload identity. Redeploy after it runs.
+`make env-push` sends `KEYCARD_ZONE_URL` from `.env` to the linked Vercel project. When `.env` also has `KEYCARD_WORKLOAD_CLIENT_ID`, it sends that value as `KEYCARD_CLIENT_ID`. It never sends the local `KEYCARD_CLIENT_ID` or `KEYCARD_CLIENT_SECRET`, because the deployed server authenticates with Vercel's workload identity. Redeploy after it runs.
 
 ## Project layout
 
@@ -129,17 +130,26 @@ Run these commands from this project's folder after enrolling it locally:
 brew install flyctl
 fly auth login
 fly launch --no-deploy
-fly secrets set --stage KEYCARD_ZONE_URL="$(grep ^KEYCARD_ZONE_URL= .env | cut -d= -f2-)"
 fly ips allocate-v4 --shared
 fly ips allocate-v6
+```
+
+Use the included `fly.toml` when prompted. `fly launch` writes the app name into it; choose your organization in its settings. Skip an IP allocation if `fly ips list` already shows that address type.
+
+In the Console guide's Deploy step, choose **Fly** and submit the organization slug, app name, Machine name (`local-tools`), and deployed URL (`https://<app-name>.fly.dev`). For a personal organization, use your account slug from `fly.io/dashboard/<slug>`, not the `personal` alias shown by `fly orgs list`. Keycard adds a Fly OIDC Provider, a Workload Identity credential scoped to that Machine, and the deployed `/mcp` Resource to your enrolled Application, then shows the workload client ID.
+
+Add that ID to `.env` as `KEYCARD_WORKLOAD_CLIENT_ID`, then stage the Keycard values together and start the Machine:
+
+```bash
+fly secrets set --stage \
+  KEYCARD_ZONE_URL="$(grep ^KEYCARD_ZONE_URL= .env | cut -d= -f2-)" \
+  KEYCARD_CLIENT_ID="$(grep ^KEYCARD_WORKLOAD_CLIENT_ID= .env | cut -d= -f2-)"
 fly machine run . --name local-tools --port 443:8181/tcp:tls:http --port 80:8181/tcp:http --restart always
 ```
 
-Use the included `fly.toml` when prompted. `fly launch` writes the app name into it; choose your organization in its settings. Skip an IP allocation if `fly ips list` already shows that address type. The named Machine serves HTTP continuously, not on a schedule. Don't use `fly deploy`: it creates Machines with generated names instead of the identity you register next.
+The named Machine serves HTTP continuously, not on a schedule. Don't use `fly deploy`: it creates Machines with generated names instead of the identity you registered.
 
-In the Console guide's Deploy step, choose **Fly** and submit the organization slug, app name, Machine name (`local-tools`), and deployed URL (`https://<app-name>.fly.dev`). For a personal organization, use your account slug from `fly.io/dashboard/<slug>`, not the `personal` alias shown by `fly orgs list`. Keycard adds a Fly OIDC Provider, a Workload Identity credential scoped to that Machine, and the deployed `/mcp` Resource to your enrolled Application.
-
-The server obtains fresh Fly identity tokens from the SDK's `FlyTokenSource` over `/.fly/api`. The client ID and secret stay local. `MCP_SERVER_URL` defaults to `https://<app-name>.fly.dev/mcp`; for a custom domain, set that variable on Fly and use the same URL in the form. The startup identity check is off on Fly so the server starts before you register it. Its first tool call is the proof of the deployed identity.
+The server obtains fresh Fly identity tokens from the SDK's `FlyTokenSource` over `/.fly/api` and names its credential with `KEYCARD_CLIENT_ID`. The local client ID and secret stay in `.env`. `MCP_SERVER_URL` defaults to `https://<app-name>.fly.dev/mcp`; for a custom domain, set that variable on Fly and use the same URL in the form. The startup identity check is off on Fly, so the Machine's first tool call is the proof of the deployed identity.
 
 Add the deployed `/mcp` URL to your coding agent, then call a tool. The exchange appears under Activity with your delegated identity and the server's Fly workload credential. [The Fly walkthrough](https://docs.keycard.ai/guides/run-apps-without-static-secrets/#deploy-the-onboarding-mcp-server) covers these steps in detail.
 
@@ -147,7 +157,9 @@ Add the deployed `/mcp` URL to your coding agent, then call a tool. The exchange
 
 We're still building the Vercel path, and the production credential handling remains unfinished. Run `vercel deploy`, then give the console your Vercel team slug, project name, and the deployed URL. Keycard creates a provider for your team, registers the deployed endpoint, and issues a workload identity credential keyed to it.
 
-The deployed server holds no secret at all. Vercel mints a short-lived OIDC token for every function invocation, Keycard trusts your team's issuer, and the exchange happens against that. The client ID and secret in `.env` stay local.
+Keycard then shows the workload client ID. Add it to `.env` as `KEYCARD_WORKLOAD_CLIENT_ID`, run `make env-push`, and redeploy with `vercel deploy --prod`.
+
+The deployed server holds no secret at all. Vercel mints a short-lived OIDC token for every function invocation, Keycard trusts your team's issuer, and the exchange happens against that. The workload client ID only names which credential to check the token against. The client ID and secret in `.env` stay local.
 
 The deployed server does not announce an identity of its own. Each tool call authenticates its token exchange with the workload identity, so the deployment shows up on the Activity feed through the first real call rather than through a separate self-issued announcement.
 
@@ -156,6 +168,8 @@ The deployed server does not announce an identity of its own. Each tool call aut
 If startup fails with `KEYCARD_ZONE_URL is not set`, you haven't run `keycard new mcp` yet.
 
 If the log says no application credential was found, you haven't run `keycard new mcp` yet. The server still serves; only the startup identity call is skipped.
+
+If a deployed tool call fails with `invalid_client: No token application credential configured for provider '…' and subject '…'`, the deployment isn't sending its workload client ID. Set `KEYCARD_CLIENT_ID` on the host to the workload client ID Keycard showed when you registered the deployment, then redeploy or restart.
 
 If a GitHub tool returns a token exchange error, GitHub isn't a dependency of the application yet, or you haven't consented to this agent using it. Both are fixed in the console under Dependencies.
 

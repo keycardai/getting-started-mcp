@@ -64,6 +64,23 @@ class DeploymentTest(unittest.TestCase):
                 server._vercel_oidc_token, client_id=None
             )
 
+    def test_deployed_credential_names_workload_client_id(self):
+        for marker in ("FLY_APP_NAME", "VERCEL"):
+            with (
+                self.subTest(marker=marker),
+                patch.dict(
+                    os.environ,
+                    {marker: "1", "KEYCARD_CLIENT_ID": "workload-cred"},
+                    clear=True,
+                ),
+                patch.object(server, "FlyTokenSource"),
+                patch.object(server, "WorkloadIdentity") as credential,
+            ):
+                server._application_credential()
+                self.assertEqual(
+                    credential.call_args.kwargs, {"client_id": "workload-cred"}
+                )
+
     def test_deployed_startup_does_not_require_registration(self):
         for marker in ("FLY_APP_NAME", "VERCEL"):
             with (

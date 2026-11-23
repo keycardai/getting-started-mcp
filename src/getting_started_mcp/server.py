@@ -74,10 +74,12 @@ def _application_credential() -> WorkloadIdentity | None:
     locally, so AuthProvider falls back to discovering
     KEYCARD_CLIENT_ID/KEYCARD_CLIENT_SECRET from the environment for local runs.
 
-    Requires Vercel's OIDC federation to be enabled for the project. The
-    KEYCARD_CLIENT_ID is only needed when the zone resolves the application by a
-    token-federation rule; it is a client identifier, not a secret, and is
-    omitted when unset.
+    Requires Vercel's OIDC federation to be enabled for the project. Deployed,
+    KEYCARD_CLIENT_ID is the workload client ID Keycard shows when you register
+    the deployment, not the local client-secret credential's ID. Keycard looks
+    up a v2 workload identity credential by it and rejects the exchange without
+    it. It is a client identifier, not a secret, and is omitted when unset,
+    which only a v1 credential accepts.
     """
     if os.getenv("VERCEL"):
         return WorkloadIdentity(

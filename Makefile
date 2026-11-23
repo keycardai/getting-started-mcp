@@ -4,8 +4,9 @@
 VERCEL_ENV ?= production
 
 # Keys from .env that `make env-push` copies to Vercel. Production
-# authenticates with Vercel's OIDC workload identity, so the client id and
-# secret stay local. The function refuses to start without the zone URL.
+# authenticates with Vercel's OIDC workload identity, so the client secret
+# stays local. The function refuses to start without the zone URL. env-push
+# also sends KEYCARD_WORKLOAD_CLIENT_ID, when .env has it, as KEYCARD_CLIENT_ID.
 DEPLOY_ENV_VARS ?= KEYCARD_ZONE_URL
 
 .DEFAULT_GOAL := help

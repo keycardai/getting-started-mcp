@@ -5,8 +5,8 @@
 # environment; the Makefile sets both. Values are never printed.
 #
 # KEYCARD_ZONE_URL comes from .env. The deployed application authenticates
-# with Vercel's OIDC workload identity, so KEYCARD_CLIENT_ID and
-# KEYCARD_CLIENT_SECRET stay local.
+# with Vercel's OIDC workload identity, so KEYCARD_CLIENT_SECRET stays local.
+# KEYCARD_WORKLOAD_CLIENT_ID, when set, is pushed as KEYCARD_CLIENT_ID.
 
 set -euo pipefail
 
@@ -49,14 +49,9 @@ read_value() {
 }
 
 status=0
-for key in $DEPLOY_ENV_VARS; do
-  value="$(read_value "$key")"
 
-  if [ -z "$value" ]; then
-    echo "  skip  $key (not set in $ENV_FILE)"
-    status=1
-    continue
-  fi
+push() {
+  local key="$1" value="$2"
 
   # Vercel has no upsert, so remove any existing value first. A missing key is
   # not an error here.
@@ -68,7 +63,29 @@ for key in $DEPLOY_ENV_VARS; do
     echo "  fail  $key (vercel env add rejected it)"
     status=1
   fi
+}
+
+for key in $DEPLOY_ENV_VARS; do
+  value="$(read_value "$key")"
+
+  if [ -z "$value" ]; then
+    echo "  skip  $key (not set in $ENV_FILE)"
+    status=1
+    continue
+  fi
+
+  push "$key" "$value"
 done
+
+# The deployed server reads KEYCARD_CLIENT_ID, but in .env that name holds the
+# local client-secret credential's ID, which Keycard rejects from Vercel. The
+# workload client ID gets its own key so the two can't be confused.
+workload_client_id="$(read_value KEYCARD_WORKLOAD_CLIENT_ID)"
+if [ -n "$workload_client_id" ]; then
+  push KEYCARD_CLIENT_ID "$workload_client_id"
+else
+  echo "  skip  KEYCARD_CLIENT_ID (add KEYCARD_WORKLOAD_CLIENT_ID to $ENV_FILE once Keycard shows it after you register the deployment)"
+fi
 
 if [ "$status" -eq 0 ]; then
   echo "Env is set. Redeploy for it to take effect: vercel deploy --prod"
