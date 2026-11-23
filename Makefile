@@ -3,14 +3,15 @@
 
 VERCEL_ENV ?= production
 
-# Keys from .env that `make env-push` copies to Vercel. Production
-# authenticates with Vercel's OIDC workload identity, so the client secret
-# stays local. The function refuses to start without the zone URL. env-push
-# also sends KEYCARD_WORKLOAD_CLIENT_ID, when .env has it, as KEYCARD_CLIENT_ID.
+# Keys from .env that `make env-push` copies to Vercel and `make fly-secrets`
+# stages on Fly. Production authenticates with the host's OIDC workload
+# identity, so the client secret stays local. The server refuses to start
+# without the zone URL. Both targets also send KEYCARD_WORKLOAD_CLIENT_ID as
+# KEYCARD_CLIENT_ID.
 DEPLOY_ENV_VARS ?= KEYCARD_ZONE_URL
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev run test typecheck clean env-push env-pull env-list
+.PHONY: help install dev run test typecheck clean env-push env-pull env-list fly-secrets
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -46,3 +47,6 @@ env-pull: ## Pull Vercel environment into .env.local
 env-list: ## List the environment set on the Vercel project
 	@command -v vercel >/dev/null 2>&1 || { echo "vercel not found. Install it with: npm i -g vercel"; exit 1; }
 	vercel env ls $(VERCEL_ENV)
+
+fly-secrets: ## Stage DEPLOY_ENV_VARS and the workload client ID from .env on Fly
+	@DEPLOY_ENV_VARS="$(DEPLOY_ENV_VARS)" ./scripts/fly-secrets.sh

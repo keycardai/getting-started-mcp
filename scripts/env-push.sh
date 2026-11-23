@@ -13,7 +13,8 @@ set -euo pipefail
 # Keep the Vercel CLI from opening any interactive prompt.
 export CI=1
 
-ENV_FILE="${ENV_FILE:-.env}"
+. "$(dirname "$0")/env-file.sh"
+
 VERCEL_ENV="${VERCEL_ENV:-production}"
 DEPLOY_ENV_VARS="${DEPLOY_ENV_VARS:-}"
 
@@ -39,14 +40,6 @@ if [ ! -f "${VERCEL_PROJECT_FILE:-.vercel/project.json}" ]; then
   echo "This directory is not linked to a Vercel project. Run: vercel link" >&2
   exit 1
 fi
-
-# Read one key's value from the env file, taking the last definition and
-# stripping surrounding quotes.
-read_value() {
-  sed -n "s/^[[:space:]]*$1=//p" "$ENV_FILE" \
-    | tail -n 1 \
-    | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
-}
 
 status=0
 
@@ -88,7 +81,11 @@ else
 fi
 
 if [ "$status" -eq 0 ]; then
-  echo "Env is set. Deploy for it to take effect: vercel deploy --prod"
+  if [ -n "$workload_client_id" ]; then
+    echo "Env is set. Deploy for it to take effect: vercel deploy --prod"
+  else
+    echo "KEYCARD_CLIENT_ID is not set, so a v2 workload credential will reject deployed tool calls with invalid_client. Add KEYCARD_WORKLOAD_CLIENT_ID to $ENV_FILE and run make env-push again before deploying."
+  fi
 fi
 
 exit $status
