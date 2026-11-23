@@ -107,7 +107,7 @@ Run `make` to see the list.
 | `make env-pull`  | Pull the Vercel environment into `.env.local`.   |
 | `make env-list`  | List the environment set on the Vercel project.  |
 
-`make env-push` sends `KEYCARD_ZONE_URL` from `.env` to the linked Vercel project. When `.env` also has `KEYCARD_WORKLOAD_CLIENT_ID`, it sends that value as `KEYCARD_CLIENT_ID`. It never sends the local `KEYCARD_CLIENT_ID` or `KEYCARD_CLIENT_SECRET`, because the deployed server authenticates with Vercel's workload identity. Redeploy after it runs.
+`make env-push` sends `KEYCARD_ZONE_URL` from `.env` to the linked Vercel project. When `.env` also has `KEYCARD_WORKLOAD_CLIENT_ID`, it sends that value as `KEYCARD_CLIENT_ID`. It never sends the local `KEYCARD_CLIENT_ID` or `KEYCARD_CLIENT_SECRET`, because the deployed server authenticates with Vercel's workload identity. Deploy after it runs; a running deployment keeps the values it started with.
 
 ## Project layout
 
@@ -155,9 +155,16 @@ Add the deployed `/mcp` URL to your coding agent, then call a tool. The exchange
 
 ### Vercel
 
-We're still building the Vercel path, and the production credential handling remains unfinished. Run `vercel deploy`, then give the console your Vercel team slug, project name, and the deployed URL. Keycard creates a provider for your team, registers the deployed endpoint, and issues a workload identity credential keyed to it.
+We're still building the Vercel path, and the production credential handling remains unfinished. Link the project with `vercel link`, then register it before deploying: give the console your Vercel team slug and project name. Keycard creates a provider for your team, registers the endpoint at `https://<project>.vercel.app/mcp`, and issues a workload identity credential keyed to the project.
 
-Keycard then shows the workload client ID. Add it to `.env` as `KEYCARD_WORKLOAD_CLIENT_ID`, run `make env-push`, and redeploy with `vercel deploy --prod`.
+Keycard then shows the workload client ID. Add it to `.env` as `KEYCARD_WORKLOAD_CLIENT_ID`, then push the Keycard values together and deploy once:
+
+```bash
+make env-push
+vercel deploy --prod
+```
+
+If the deploy prints a production URL other than `https://<project>.vercel.app` (Vercel suffixes a hostname that's already taken), edit the deployment in the console and enter that URL. The server picks up its URL from Vercel, so the correction needs no new deploy.
 
 The deployed server holds no secret at all. Vercel mints a short-lived OIDC token for every function invocation, Keycard trusts your team's issuer, and the exchange happens against that. The workload client ID only names which credential to check the token against. The client ID and secret in `.env` stay local.
 

@@ -88,7 +88,7 @@ else
 fi
 
 if [ "$status" -eq 0 ]; then
-  echo "Env is set. Redeploy for it to take effect: vercel deploy --prod"
+  echo "Env is set. Deploy for it to take effect: vercel deploy --prod"
 fi
 
 exit $status
