@@ -2,9 +2,10 @@
 # Stage selected keys from .env as Fly secrets for the next `fly machine run`.
 #
 # Reads DEPLOY_ENV_VARS (space-separated key names) from the environment; the
-# Makefile sets it. KEYCARD_WORKLOAD_CLIENT_ID is staged as KEYCARD_CLIENT_ID.
-# Nothing is staged unless every value is set, so the Machine can't start with
-# an empty client ID.
+# Makefile sets it. .env's KEYCARD_CLIENT_ID belongs to the local credential and
+# is never staged; the Machine's KEYCARD_CLIENT_ID is the workload client ID,
+# which the console's Deploy step sets after you register the deployment.
+# Nothing is staged unless every value is set.
 
 set -euo pipefail
 
@@ -22,9 +23,14 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
+if [ -z "${DEPLOY_ENV_VARS// /}" ]; then
+  echo "DEPLOY_ENV_VARS is empty, so there is nothing to stage."
+  exit 0
+fi
+
 secrets=()
 missing=0
-for key in $DEPLOY_ENV_VARS KEYCARD_WORKLOAD_CLIENT_ID; do
+for key in $DEPLOY_ENV_VARS; do
   value="$(read_value "$key")"
 
   if [ -z "$value" ]; then
@@ -33,11 +39,6 @@ for key in $DEPLOY_ENV_VARS KEYCARD_WORKLOAD_CLIENT_ID; do
     continue
   fi
 
-  # The Machine reads KEYCARD_CLIENT_ID, but in .env that name holds the local
-  # client-secret credential's ID, which Keycard rejects from Fly.
-  if [ "$key" = KEYCARD_WORKLOAD_CLIENT_ID ]; then
-    key=KEYCARD_CLIENT_ID
-  fi
   secrets+=("$key=$value")
 done
 

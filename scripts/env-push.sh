@@ -6,7 +6,9 @@
 #
 # KEYCARD_ZONE_URL comes from .env. The deployed application authenticates
 # with Vercel's OIDC workload identity, so KEYCARD_CLIENT_SECRET stays local.
-# KEYCARD_WORKLOAD_CLIENT_ID, when set, is pushed as KEYCARD_CLIENT_ID.
+# .env's KEYCARD_CLIENT_ID belongs to the local credential and is never pushed;
+# the host's KEYCARD_CLIENT_ID is the workload client ID, which the console's
+# Deploy step sets after you register the deployment.
 
 set -euo pipefail
 
@@ -70,22 +72,8 @@ for key in $DEPLOY_ENV_VARS; do
   push "$key" "$value"
 done
 
-# The deployed server reads KEYCARD_CLIENT_ID, but in .env that name holds the
-# local client-secret credential's ID, which Keycard rejects from Vercel. The
-# workload client ID gets its own key so the two can't be confused.
-workload_client_id="$(read_value KEYCARD_WORKLOAD_CLIENT_ID)"
-if [ -n "$workload_client_id" ]; then
-  push KEYCARD_CLIENT_ID "$workload_client_id"
-else
-  echo "  skip  KEYCARD_CLIENT_ID (add KEYCARD_WORKLOAD_CLIENT_ID to $ENV_FILE once Keycard shows it after you register the deployment)"
-fi
-
 if [ "$status" -eq 0 ]; then
-  if [ -n "$workload_client_id" ]; then
-    echo "Env is set. Deploy for it to take effect: vercel deploy --prod"
-  else
-    echo "KEYCARD_CLIENT_ID is not set, so a v2 workload credential will reject deployed tool calls with invalid_client. Add KEYCARD_WORKLOAD_CLIENT_ID to $ENV_FILE and run make env-push again before deploying."
-  fi
+  echo "Env is set. Deploy for it to take effect: vercel deploy --prod"
 fi
 
 exit $status
