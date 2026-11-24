@@ -5,15 +5,18 @@
 # environment; the Makefile sets both. Values are never printed.
 #
 # KEYCARD_ZONE_URL comes from .env. The deployed application authenticates
-# with Vercel's OIDC workload identity, so KEYCARD_CLIENT_ID and
-# KEYCARD_CLIENT_SECRET stay local.
+# with Vercel's OIDC workload identity, so KEYCARD_CLIENT_SECRET stays local.
+# .env's KEYCARD_CLIENT_ID belongs to the local credential and is never pushed;
+# the host's KEYCARD_CLIENT_ID is the workload client ID, which the console's
+# Deploy step sets after you register the deployment.
 
 set -euo pipefail
 
 # Keep the Vercel CLI from opening any interactive prompt.
 export CI=1
 
-ENV_FILE="${ENV_FILE:-.env}"
+. "$(dirname "$0")/env-file.sh"
+
 VERCEL_ENV="${VERCEL_ENV:-production}"
 DEPLOY_ENV_VARS="${DEPLOY_ENV_VARS:-}"
 
@@ -40,23 +43,10 @@ if [ ! -f "${VERCEL_PROJECT_FILE:-.vercel/project.json}" ]; then
   exit 1
 fi
 
-# Read one key's value from the env file, taking the last definition and
-# stripping surrounding quotes.
-read_value() {
-  sed -n "s/^[[:space:]]*$1=//p" "$ENV_FILE" \
-    | tail -n 1 \
-    | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
-}
-
 status=0
-for key in $DEPLOY_ENV_VARS; do
-  value="$(read_value "$key")"
 
-  if [ -z "$value" ]; then
-    echo "  skip  $key (not set in $ENV_FILE)"
-    status=1
-    continue
-  fi
+push() {
+  local key="$1" value="$2"
 
   # Vercel has no upsert, so remove any existing value first. A missing key is
   # not an error here.
@@ -68,10 +58,22 @@ for key in $DEPLOY_ENV_VARS; do
     echo "  fail  $key (vercel env add rejected it)"
     status=1
   fi
+}
+
+for key in $DEPLOY_ENV_VARS; do
+  value="$(read_value "$key")"
+
+  if [ -z "$value" ]; then
+    echo "  skip  $key (not set in $ENV_FILE)"
+    status=1
+    continue
+  fi
+
+  push "$key" "$value"
 done
 
 if [ "$status" -eq 0 ]; then
-  echo "Env is set. Redeploy for it to take effect: vercel deploy --prod"
+  echo "Env is set. Deploy for it to take effect: vercel deploy --prod"
 fi
 
 exit $status
